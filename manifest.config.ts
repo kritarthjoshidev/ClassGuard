@@ -1,0 +1,21 @@
+import { defineManifest } from '@crxjs/vite-plugin';
+
+export default defineManifest({
+  manifest_version: 3,
+  name: 'ClassGuard — Classroom Security',
+  version: '1.0.0',
+  description: 'Privacy-friendly behavioral risk signals for Google Meet.',
+  action: {
+    default_popup: 'src/popup.html',
+    default_title: 'ClassGuard',
+  },
+  content_scripts: [
+    {
+      matches: ['https://meet.google.com/*'],
+      js: ['src/content/index.ts'],
+      run_at: 'document_idle',
+    },
+  ],
+  permissions: ['storage'],
+  host_permissions: ['https://meet.google.com/*'],
+});

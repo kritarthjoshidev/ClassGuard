@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isActiveGoogleMeetUrl } from './meeting-detection';
+import manifest from '../../manifest.config.ts';
 
 describe('extension foundation', () => {
   it('recognizes an active Google Meet meeting URL without accepting unrelated pages', () => {
@@ -12,18 +13,20 @@ describe('extension foundation', () => {
   });
 
   it('keeps the shipped manifest minimal and Manifest V3 compliant', () => {
-    const manifestPath = resolve(process.cwd(), 'public/manifest.json');
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    const manifestPath = resolve(process.cwd(), 'manifest.config.ts');
+    const source = readFileSync(manifestPath, 'utf8');
+    const manifestDefinition = manifest as {
       manifest_version: number;
       permissions: string[];
       host_permissions: string[];
       content_scripts: Array<{ matches: string[]; js: string[] }>;
     };
 
-    expect(manifest.manifest_version).toBe(3);
-    expect(manifest.permissions).toEqual(['storage']);
-    expect(manifest.host_permissions).toEqual(['https://meet.google.com/*']);
-    expect(manifest.content_scripts[0].matches).toEqual(['https://meet.google.com/*']);
-    expect(manifest.content_scripts[0].js).toEqual(['content.js']);
+    expect(manifestDefinition.manifest_version).toBe(3);
+    expect(manifestDefinition.permissions).toEqual(['storage']);
+    expect(manifestDefinition.host_permissions).toEqual(['https://meet.google.com/*']);
+    expect(manifestDefinition.content_scripts[0].matches).toEqual(['https://meet.google.com/*']);
+    expect(manifestDefinition.content_scripts[0].js).toEqual(['src/content/index.ts']);
+    expect(source).toContain("default_popup: 'src/popup.html'");
   });
 });
