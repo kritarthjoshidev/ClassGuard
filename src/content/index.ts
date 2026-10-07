@@ -1,4 +1,5 @@
 import { MeetAdapter } from '../adapters/meet/meet-adapter';
+import { isActiveGoogleMeetUrl } from './meeting-detection';
 
 const adapter = new MeetAdapter(document);
 
@@ -7,11 +8,12 @@ function emit(message: string): void {
 }
 
 function initialize(): void {
-  const meetingUrl = window.location.href;
-  if (!meetingUrl.includes('meet.google.com')) return;
+  if (!isActiveGoogleMeetUrl(window.location.href)) return;
+
   const observed = adapter.detectMeeting();
   if (observed) {
-    emit('Meeting detected — Protection Active');
+    emit('Meeting detected');
+    emit('Protection active');
     adapter.start();
   }
 }
