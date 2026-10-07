@@ -1,14 +1,19 @@
 // @vitest-environment happy-dom
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MeetAdapter } from './meet-adapter';
 
 describe('MeetAdapter', () => {
-  afterEach(() => {
-    document.body.innerHTML = '';
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  it('registers one participant detector and publishes participant state', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.useRealTimers();
+  });
+
+  it('starts and stops the participant detector without duplicates', () => {
     const onParticipants = vi.fn();
     const adapter = new MeetAdapter(document, onParticipants);
     const participant = document.createElement('div');
@@ -18,18 +23,18 @@ describe('MeetAdapter', () => {
 
     adapter.start();
     adapter.start();
+    vi.advanceTimersByTime(200);
 
-    expect(onParticipants).toHaveBeenLastCalledWith([
-      {
-        participantName: 'Asha Sharma',
-        score: 0,
-        reasons: [],
-        events: [],
-        lastUpdated: expect.any(Number),
-      },
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0]).toEqual([
+      { participantName: 'Asha Sharma', observedAt: expect.any(Number) },
     ]);
 
     adapter.stop();
     adapter.stop();
+    document.body.appendChild(participant);
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
   });
 });

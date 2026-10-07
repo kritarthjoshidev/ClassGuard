@@ -1,6 +1,5 @@
+import type { Participant } from '../adapters/meet/participant-detector';
 import { mountSecurityPanel } from './SecurityPanel';
-
-import type { ParticipantState } from '../core/types';
 
 export class SecurityPanelHost {
   private readonly host = document.createElement('div');
@@ -26,7 +25,7 @@ export class SecurityPanelHost {
     this.panelController = mountSecurityPanel(this.mountTarget);
   }
 
-  setParticipants(participants: ParticipantState[]): void {
+  setParticipants(participants: Participant[]): void {
     this.panelController?.setParticipants(participants);
   }
 

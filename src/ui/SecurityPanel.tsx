@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { ParticipantState, RiskLevel } from '../core/types';
+import type { Participant } from '../adapters/meet/participant-detector';
 
 export interface SecurityPanelProps {
-  participantStates?: ParticipantState[];
+  participants?: Participant[];
 }
 
 const panelStyles = `
@@ -53,26 +53,14 @@ const panelStyles = `
   .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 12px; }
   .count { padding: 7px 6px; border-radius: 8px; background: #f8fafc; text-align: center; font-size: 11px; }
   .count strong { display: block; font-size: 16px; }
-  .safe { color: #047857; }
-  .watch { color: #b45309; }
-  .high { color: #b91c1c; }
-  .risk { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px; font-weight: 700; }
+  .participant-list { display: grid; gap: 6px; margin-top: 10px; }
+  .participant { padding: 7px 8px; border-radius: 8px; background: #f8fafc; color: #0f172a; font-size: 11px; overflow-wrap: anywhere; }
   .collapsed .body { display: none; }
   .collapsed .header { border-radius: 14px 14px 0 0; }
 `;
 
-function getRiskLevel(score: number): RiskLevel {
-  if (score >= 70) return 'high';
-  if (score >= 35) return 'watch';
-  return 'safe';
-}
-
-export function SecurityPanel({ participantStates = [] }: SecurityPanelProps) {
+export function SecurityPanel({ participants = [] }: SecurityPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const safeCount = participantStates.filter((participant) => getRiskLevel(participant.score) === 'safe').length;
-  const watchCount = participantStates.filter((participant) => getRiskLevel(participant.score) === 'watch').length;
-  const highRiskCount = participantStates.filter((participant) => getRiskLevel(participant.score) === 'high').length;
-  const overallRisk = participantStates.reduce((maximum, participant) => Math.max(maximum, participant.score), 0);
 
   return (
     <section className={collapsed ? 'panel collapsed' : 'panel'} aria-label="ClassGuard security panel">
@@ -93,38 +81,35 @@ export function SecurityPanel({ participantStates = [] }: SecurityPanelProps) {
         </button>
       </header>
       <div className="body">
-        <p className="metric"><strong>Participants:</strong> {participantStates.length}</p>
-        <div className="counts" aria-label="Participant risk counts">
-          <div className="count safe"><strong>{safeCount}</strong>Safe</div>
-          <div className="count watch"><strong>{watchCount}</strong>Watch</div>
-          <div className="count high"><strong>{highRiskCount}</strong>High Risk</div>
+        <p className="metric"><strong>Participants:</strong> {participants.length}</p>
+        <div className="participant-list" aria-label="Observed participant names">
+          {participants.length === 0
+            ? <div className="participant">Waiting for observable participants.</div>
+            : participants.map((participant) => (
+              <div className="participant" key={participant.participantName}>
+                • {participant.participantName}
+              </div>
+            ))}
         </div>
-        <div className="risk">
-          <span>Overall Risk</span>
-          <span>{overallRisk}</span>
-        </div>
-        <p className="metric" style={{ marginTop: 10, marginBottom: 0, fontSize: 10, color: '#64748b' }}>
-          {participantStates.length === 0 ? 'Waiting for participant state.' : 'Live participant state.'}
-        </p>
       </div>
     </section>
   );
 }
 
 export interface SecurityPanelController {
-  setParticipants: (participantStates: ParticipantState[]) => void;
+  setParticipants: (participants: Participant[]) => void;
   unmount: () => void;
 }
 
-export function mountSecurityPanel(root: HTMLElement, participantStates: ParticipantState[] = []): SecurityPanelController {
+export function mountSecurityPanel(root: HTMLElement, participants: Participant[] = []): SecurityPanelController {
   const shadowRoot = root.attachShadow({ mode: 'open' });
   const reactRoot = createRoot(shadowRoot);
-  let currentParticipants = participantStates;
+  let currentParticipants = participants;
 
   const render = (): void => {
     reactRoot.render(
       <React.StrictMode>
-        <SecurityPanel participantStates={currentParticipants} />
+        <SecurityPanel participants={currentParticipants} />
       </React.StrictMode>,
     );
   };

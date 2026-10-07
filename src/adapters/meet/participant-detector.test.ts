@@ -1,55 +1,211 @@
 // @vitest-environment happy-dom
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParticipantDetector } from './participant-detector';
 
+function createParticipant(id: string, name: string): HTMLElement {
+  const element = document.createElement('div');
+  element.dataset.participantId = id;
+  element.setAttribute('aria-label', name);
+  return element;
+}
+
 describe('ParticipantDetector', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('chrome', {
+      storage: { local: { set: vi.fn() } },
+    });
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
-  it('detects unique participant cards from stable meet DOM attributes', () => {
-    document.body.innerHTML = `
-      <div data-participant-id="p-1" aria-label="Asha Sharma">
-        <span>Asha Sharma</span>
-      </div>
-      <div data-participant-id="p-2" aria-label="Rohan Verma">
-        <span>Rohan Verma</span>
-      </div>
-      <div data-participant-id="p-1" aria-label="Asha Sharma">
-        <span>Asha Sharma</span>
-      </div>
-    `;
-
+  it('detects one observable participant name', () => {
+    document.body.appendChild(createParticipant('p-1', 'Alice Sharma'));
     const onParticipants = vi.fn();
     const detector = new ParticipantDetector(document, onParticipants);
+
     detector.start();
+    vi.advanceTimersByTime(200);
 
     expect(onParticipants).toHaveBeenCalledTimes(1);
-    expect(onParticipants.mock.calls[0][0]).toEqual([
-      { id: 'p-1', name: 'Asha Sharma' },
-      { id: 'p-2', name: 'Rohan Verma' },
+    expect(onParticipants).toHaveBeenCalledWith([
+      { participantName: 'Alice Sharma', observedAt: expect.any(Number) },
     ]);
-
-    detector.stop();
   });
 
-  it('refreshes when participant DOM nodes are added or removed', () => {
+  it('detects multiple participants', () => {
+    document.body.append(
+      createParticipant('p-1', 'Alice Sharma'),
+      createParticipant('p-2', 'Rohan Verma'),
+    );
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0].map((participant: { participantName: string }) => participant.participantName))
+      .toEqual(['Alice Sharma', 'Rohan Verma']);
+  });
+
+  it('deduplicates duplicate DOM representations by normalized display name', () => {
+    document.body.append(
+      createParticipant('p-1', 'Alice Sharma'),
+      createParticipant('p-1-copy', 'Alice Sharma'),
+    );
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([
+      { participantName: 'Alice Sharma', observedAt: expect.any(Number) },
+    ]);
+  });
+
+  it('normalizes whitespace and ignores empty names', () => {
+    document.body.append(
+      createParticipant('p-1', '  Alice   Sharma  '),
+      createParticipant('p-2', '   '),
+    );
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([
+      { participantName: 'Alice Sharma', observedAt: expect.any(Number) },
+    ]);
+  });
+
+  it('ignores non-participant UI labels', () => {
+    const label = document.createElement('button');
+    label.setAttribute('aria-label', 'Chat');
+    label.setAttribute('data-participant-id', 'not-a-participant');
+    document.body.appendChild(label);
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([]);
+  });
+
+  it('does not emit when the participant snapshot is unchanged', () => {
+    document.body.append(createParticipant('p-1', 'Alice Sharma'));
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    const duplicate = createParticipant('p-1-copy', 'Alice Sharma');
+    document.body.appendChild(duplicate);
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).not.toHaveBeenCalled();
+  });
+
+  it('emits when a participant is added', async () => {
+    document.body.append(createParticipant('p-1', 'Alice Sharma'));
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    document.body.appendChild(createParticipant('p-2', 'Rohan Verma'));
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0].map((participant: { participantName: string }) => participant.participantName))
+      .toEqual(['Alice Sharma', 'Rohan Verma']);
+  });
+
+  it('emits when a participant is removed', async () => {
+    document.body.append(createParticipant('p-1', 'Alice Sharma'));
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    document.querySelector('[data-participant-id="p-1"]')?.remove();
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([]);
+  });
+
+  it('does not emit when participant ordering changes', () => {
+    document.body.append(
+      createParticipant('p-1', 'Alice Sharma'),
+      createParticipant('p-2', 'Rohan Verma'),
+    );
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    document.body.appendChild(document.querySelector('[data-participant-id="p-1"]')!);
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).not.toHaveBeenCalled();
+  });
+
+  it('start is idempotent and stop disconnects the observer', () => {
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    detector.start();
+    vi.advanceTimersByTime(200);
+    detector.stop();
+    detector.stop();
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('batches multiple mutations into one refresh', () => {
     const onParticipants = vi.fn();
     const detector = new ParticipantDetector(document, onParticipants);
     detector.start();
 
-    const participant = document.createElement('div');
-    participant.dataset.participantId = 'p-3';
-    participant.setAttribute('aria-label', 'Neha Patel');
-    document.body.appendChild(participant);
+    document.body.appendChild(createParticipant('p-1', 'Alice Sharma'));
+    document.body.appendChild(createParticipant('p-2', 'Rohan Verma'));
+    document.body.appendChild(createParticipant('p-3', 'Neha Patel'));
+    vi.advanceTimersByTime(200);
 
-    vi.waitFor(() => {
-      expect(onParticipants).toHaveBeenLastCalledWith([
-        { id: 'p-3', name: 'Neha Patel' },
-      ]);
-    });
-
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0]).toHaveLength(3);
     detector.stop();
+  });
+
+  it('does not write to chrome.storage', () => {
+    const storageWrite = vi.mocked(globalThis.chrome.storage.local.set);
+    const detector = new ParticipantDetector(document, vi.fn());
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    detector.stop();
+
+    expect(storageWrite).not.toHaveBeenCalled();
   });
 });
