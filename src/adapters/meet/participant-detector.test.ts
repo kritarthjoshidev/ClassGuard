@@ -86,11 +86,14 @@ describe('ParticipantDetector', () => {
     ]);
   });
 
-  it('ignores non-participant UI labels', () => {
-    const label = document.createElement('button');
-    label.setAttribute('aria-label', 'Chat');
-    label.setAttribute('data-participant-id', 'not-a-participant');
-    document.body.appendChild(label);
+  it('ignores generic participant UI and non-participant labels', () => {
+    const genericParticipants = document.createElement('button');
+    genericParticipants.setAttribute('aria-label', 'Participants');
+    genericParticipants.setAttribute('data-participant-id', 'not-a-participant');
+    const chatLabel = document.createElement('button');
+    chatLabel.setAttribute('aria-label', 'Chat');
+    chatLabel.setAttribute('data-participant-id', 'not-a-participant');
+    document.body.append(genericParticipants, chatLabel);
     const onParticipants = vi.fn();
     const detector = new ParticipantDetector(document, onParticipants);
 
@@ -181,6 +184,18 @@ describe('ParticipantDetector', () => {
 
     expect(onParticipants).toHaveBeenCalledTimes(1);
     expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh after stop when a pending debounce fires', () => {
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    document.body.appendChild(createParticipant('p-1', 'Alice Sharma'));
+    detector.stop();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(0);
   });
 
   it('batches multiple mutations into one refresh', () => {

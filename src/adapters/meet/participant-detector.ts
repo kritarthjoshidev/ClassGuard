@@ -1,5 +1,9 @@
 import { PARTICIPANT_SELECTOR } from './selectors';
 
+/**
+ * Observable UI state only. A participant name is not a persistent identity,
+ * account ID, email address, or Google account identifier.
+ */
 export interface Participant {
   participantName: string;
   observedAt: number;

@@ -2,10 +2,13 @@ export const MEET_PAGE_SELECTOR = 'body';
 export const CHAT_PANEL_SELECTOR = '[aria-label*="Chat"], [data-tooltip*="Chat"]';
 
 /**
- * Google Meet does not expose a guarantee in this repository that a particular
- * data attribute or class is a stable participant identity. These selectors are
- * intentionally limited to participant-specific DOM candidates and must not be
- * treated as verified identity data.
+ * This is the only participant candidate selector used by the detector.
+ * Google Meet does not guarantee this attribute's presence or stability across
+ * pages/versions. It is an ephemeral DOM-scoped hint, not a persistent identity,
+ * account ID, or verified Google Meet participant identifier.
+ *
+ * The detector extracts only the displayed name from the matching element and
+ * deliberately rejects generic participant UI labels and unrelated page controls.
  */
 export const PARTICIPANT_SELECTOR = '[data-participant-id]';
 
