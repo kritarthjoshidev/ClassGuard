@@ -31,6 +31,24 @@ describe('risk engine', () => {
     expect(afterSecond.events).toHaveLength(1);
   });
 
+  it('allows the same participant event again after its cooldown expires', () => {
+    const initialState = {
+      participantName: 'Unknown123',
+      score: 0,
+      reasons: [],
+      events: [],
+      lastUpdated: 0,
+    };
+    const firstEvent = { type: 'CHAT_SPAM' as const, participantName: 'Unknown123', timestamp: 1, metadata: {} };
+    const expiredEvent = { type: 'CHAT_SPAM' as const, participantName: 'Unknown123', timestamp: 30_001, metadata: {} };
+
+    const afterFirst = applyEvent(initialState, firstEvent);
+    const afterCooldown = applyEvent(afterFirst, expiredEvent);
+
+    expect(afterCooldown.score).toBe(50);
+    expect(afterCooldown.events).toHaveLength(2);
+  });
+
   it('maps scores to expected risk levels', () => {
     expect(getRiskLevel(34)).toBe('safe');
     expect(getRiskLevel(35)).toBe('watch');

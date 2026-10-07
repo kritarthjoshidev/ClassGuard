@@ -2,20 +2,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { MeetAdapter } from './meet-adapter';
 
 describe('MeetAdapter', () => {
-  it('does not fabricate a chat event or persist it for a chat button', () => {
-    const set = vi.fn();
-    Object.defineProperty(globalThis, 'chrome', {
-      configurable: true,
-      value: { storage: { local: { set } } },
-    });
-    const root = {
-      documentElement: {},
-      querySelector: vi.fn(() => ({ ariaLabel: 'Chat' })),
-    } as unknown as Document;
-    const adapter = new MeetAdapter(root);
+  it('does not initialize a broad observer until a real detector exists', () => {
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    class FakeMutationObserver {
+      observe = observe;
+      disconnect = disconnect;
+    }
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+    const adapter = new MeetAdapter({ documentElement: {} } as Document);
 
-    (adapter as unknown as { scan: () => void }).scan();
+    adapter.start();
+    adapter.start();
+    adapter.stop();
+    adapter.stop();
 
-    expect(set).not.toHaveBeenCalled();
+    expect(observe).not.toHaveBeenCalled();
+    expect(disconnect).not.toHaveBeenCalled();
   });
 });
