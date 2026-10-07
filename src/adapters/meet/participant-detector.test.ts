@@ -86,6 +86,32 @@ describe('ParticipantDetector', () => {
     ]);
   });
 
+  it('extracts only the specific nested participant name from a participant card', () => {
+    const card = document.createElement('div');
+    card.dataset.participantId = 'p-1';
+    card.setAttribute(
+      'aria-label',
+      "frame_person You're continuously framed visual_effects Backgrounds and effects More options for Kritarth joshi",
+    );
+
+    const nameElement = document.createElement('div');
+    nameElement.dataset.participantName = 'true';
+    nameElement.textContent = '  Kritarth joshi  ';
+    card.appendChild(nameElement);
+    document.body.appendChild(card);
+
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([
+      { participantName: 'Kritarth joshi', observedAt: expect.any(Number) },
+    ]);
+    detector.stop();
+  });
+
   it('ignores generic participant UI and non-participant labels', () => {
     const genericParticipants = document.createElement('button');
     genericParticipants.setAttribute('aria-label', 'Participants');

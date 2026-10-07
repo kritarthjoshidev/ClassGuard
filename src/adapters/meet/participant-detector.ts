@@ -1,4 +1,5 @@
 import { PARTICIPANT_SELECTOR } from './selectors';
+import { extractParticipantName } from './participants';
 
 /**
  * Observable UI state only. A participant name is not a persistent identity,
@@ -94,11 +95,7 @@ export class ParticipantDetector {
 
     for (const element of this.root.querySelectorAll<HTMLElement>(PARTICIPANT_SELECTOR)) {
       const domKey = element.dataset.participantId?.trim();
-      const name = normalizeParticipantName(
-        element.getAttribute('aria-label')?.trim()
-          || element.textContent?.trim()
-          || '',
-      );
+      const name = normalizeParticipantName(extractParticipantName(element));
 
       if (!name || !domKey || isNonParticipantLabel(name)) continue;
       participants.set(name.toLocaleLowerCase(), {

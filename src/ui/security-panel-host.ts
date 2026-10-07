@@ -15,7 +15,9 @@ export class SecurityPanelHost {
     this.mountTarget.style.position = 'fixed';
     this.mountTarget.style.top = '0';
     this.mountTarget.style.right = '0';
-    this.mountTarget.style.pointerEvents = 'none';
+    this.mountTarget.style.width = '0';
+    this.mountTarget.style.height = '0';
+    this.mountTarget.style.pointerEvents = 'auto';
     this.host.appendChild(this.mountTarget);
   }
 
