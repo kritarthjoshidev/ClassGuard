@@ -1,9 +1,11 @@
 import { mountSecurityPanel } from './SecurityPanel';
 
+import type { ParticipantState } from '../core/types';
+
 export class SecurityPanelHost {
   private readonly host = document.createElement('div');
   private readonly mountTarget = document.createElement('div');
-  private unmount: (() => void) | null = null;
+  private panelController: ReturnType<typeof mountSecurityPanel> | null = null;
 
   constructor() {
     this.host.setAttribute('data-classguard-security-panel', 'true');
@@ -19,14 +21,18 @@ export class SecurityPanelHost {
   }
 
   mount(): void {
-    if (this.unmount) return;
+    if (this.panelController) return;
     document.body.appendChild(this.host);
-    this.unmount = mountSecurityPanel(this.mountTarget);
+    this.panelController = mountSecurityPanel(this.mountTarget);
+  }
+
+  setParticipants(participants: ParticipantState[]): void {
+    this.panelController?.setParticipants(participants);
   }
 
   remove(): void {
-    this.unmount?.();
-    this.unmount = null;
+    this.panelController?.unmount();
+    this.panelController = null;
     this.host.remove();
   }
 }

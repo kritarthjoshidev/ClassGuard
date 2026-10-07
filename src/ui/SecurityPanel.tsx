@@ -111,17 +111,34 @@ export function SecurityPanel({ participantStates = [] }: SecurityPanelProps) {
   );
 }
 
-export function mountSecurityPanel(root: HTMLElement, participantStates: ParticipantState[] = []): () => void {
+export interface SecurityPanelController {
+  setParticipants: (participantStates: ParticipantState[]) => void;
+  unmount: () => void;
+}
+
+export function mountSecurityPanel(root: HTMLElement, participantStates: ParticipantState[] = []): SecurityPanelController {
   const shadowRoot = root.attachShadow({ mode: 'open' });
   const reactRoot = createRoot(shadowRoot);
-  reactRoot.render(
-    <React.StrictMode>
-      <SecurityPanel participantStates={participantStates} />
-    </React.StrictMode>,
-  );
+  let currentParticipants = participantStates;
 
-  return () => {
-    reactRoot.unmount();
-    root.remove();
+  const render = (): void => {
+    reactRoot.render(
+      <React.StrictMode>
+        <SecurityPanel participantStates={currentParticipants} />
+      </React.StrictMode>,
+    );
+  };
+
+  render();
+
+  return {
+    setParticipants: (nextParticipants) => {
+      currentParticipants = nextParticipants;
+      render();
+    },
+    unmount: () => {
+      reactRoot.unmount();
+      root.remove();
+    },
   };
 }
