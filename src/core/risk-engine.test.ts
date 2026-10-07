@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateRisk, getRiskLevel, shouldEmitAlert } from './risk-engine';
+import { applyEvent, calculateRisk, getRiskLevel, shouldEmitAlert } from './risk-engine';
 
 describe('risk engine', () => {
   it('keeps score capped and applies rule cooldowns', () => {
@@ -10,6 +10,25 @@ describe('risk engine', () => {
     const score = calculateRisk(events, 1000);
     expect(score).toBeLessThanOrEqual(100);
     expect(score).toBe(25);
+  });
+
+  it('applies cooldowns consistently when mutating participant state', () => {
+    const firstEvent = { type: 'CHAT_SPAM' as const, participantName: 'Unknown123', timestamp: 1, metadata: {} };
+    const secondEvent = { type: 'CHAT_SPAM' as const, participantName: 'Unknown123', timestamp: 2, metadata: {} };
+    const initialState = {
+      participantName: 'Unknown123',
+      score: 0,
+      reasons: [],
+      events: [],
+      lastUpdated: 0,
+    };
+
+    const afterFirst = applyEvent(initialState, firstEvent);
+    const afterSecond = applyEvent(afterFirst, secondEvent);
+
+    expect(afterFirst.score).toBe(25);
+    expect(afterSecond.score).toBe(25);
+    expect(afterSecond.events).toHaveLength(1);
   });
 
   it('maps scores to expected risk levels', () => {

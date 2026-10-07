@@ -19,26 +19,41 @@ export function shouldEmitAlert(score: number): boolean {
   return score >= 70;
 }
 
+export function getEventScore(event: NormalizedEvent): number {
+  return RULES[event.type]?.score ?? 0;
+}
+
+export function canApplyEvent(event: NormalizedEvent, previousEvents: NormalizedEvent[]): boolean {
+  const rule = RULES[event.type];
+  if (!rule.score) return true;
+
+  const previous = previousEvents
+    .filter((candidate) => candidate.participantName === event.participantName && candidate.type === event.type)
+    .sort((left, right) => right.timestamp - left.timestamp)[0];
+
+  return previous === undefined || event.timestamp - previous.timestamp >= rule.cooldownMs;
+}
+
 export function calculateRisk(events: NormalizedEvent[], now = Date.now()): number {
-  const scored = new Map<string, number>();
   let total = 0;
+  const accepted = new Map<string, NormalizedEvent>();
 
   for (const event of events) {
-    const rule = RULES[event.type];
-    if (!rule.score) continue;
-    const key = `${event.participantName}:${event.type}`;
-    const previous = scored.get(key);
-    if (previous !== undefined && now - previous < rule.cooldownMs) continue;
-    scored.set(key, event.timestamp);
-    total += rule.score;
+    if (!canApplyEvent(event, [...accepted.values()])) continue;
+    const score = getEventScore(event);
+    if (!score) continue;
+    accepted.set(`${event.participantName}:${event.type}`, event);
+    total += score;
   }
 
   return Math.min(100, total);
 }
 
 export function applyEvent(state: ParticipantState, event: NormalizedEvent): ParticipantState {
+  if (!canApplyEvent(event, state.events)) return state;
+
   const reasons = new Set([...state.reasons, event.type]);
-  const score = Math.min(100, state.score + (RULES[event.type]?.score ?? 0));
+  const score = Math.min(100, state.score + getEventScore(event));
   return {
     ...state,
     score,
