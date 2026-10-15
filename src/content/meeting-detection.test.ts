@@ -17,13 +17,13 @@ describe('extension foundation', () => {
     const source = readFileSync(manifestPath, 'utf8');
     const manifestDefinition = manifest as {
       manifest_version: number;
-      permissions: string[];
+      permissions?: string[];
       host_permissions: string[];
       content_scripts: Array<{ matches: string[]; js: string[] }>;
     };
 
     expect(manifestDefinition.manifest_version).toBe(3);
-    expect(manifestDefinition.permissions).toEqual(['storage']);
+    expect(manifestDefinition.permissions ?? []).toEqual([]);
     expect(manifestDefinition.host_permissions).toEqual(['https://meet.google.com/*']);
     expect(manifestDefinition.content_scripts[0].matches).toEqual(['https://meet.google.com/*']);
     expect(manifestDefinition.content_scripts[0].js).toEqual(['src/content/index.ts']);

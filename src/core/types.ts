@@ -27,3 +27,11 @@ export interface ChatActivitySummary {
   messagesObserved: number;
   suspiciousLinks: number;
 }
+
+export interface RiskPipelineSnapshot {
+  participantStates: ParticipantState[];
+  unattributedObservationCount: number;
+  unattributedSignalTypes: EventType[];
+  /** Total signal count; optional for compatibility with older snapshot producers. */
+  unattributedSignalCount?: number;
+}

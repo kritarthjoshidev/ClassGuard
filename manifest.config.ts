@@ -16,6 +16,5 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['storage'],
   host_permissions: ['https://meet.google.com/*'],
 });

@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Participant } from '../adapters/meet/participant-detector';
-import type { ChatActivitySummary } from '../core/types';
+import { getRiskLevel } from '../core/risk-engine';
+import type { ChatActivitySummary, RiskPipelineSnapshot } from '../core/types';
 
 export interface SecurityPanelProps {
   participants?: Participant[];
   chatActivity?: ChatActivitySummary;
+  riskPipeline?: RiskPipelineSnapshot;
 }
+
+const emptyRiskPipeline: RiskPipelineSnapshot = {
+  participantStates: [],
+  unattributedObservationCount: 0,
+  unattributedSignalTypes: [],
+  unattributedSignalCount: 0,
+};
 
 const panelStyles = `
   :host {
@@ -73,6 +82,7 @@ const panelStyles = `
 export function SecurityPanel({
   participants = [],
   chatActivity = { messagesObserved: 0, suspiciousLinks: 0 },
+  riskPipeline = emptyRiskPipeline,
 }: SecurityPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -80,6 +90,8 @@ export function SecurityPanel({
   const headerRef = useRef<HTMLElement>(null);
   const dragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const unattributedSignalCount = riskPipeline.unattributedSignalCount
+    ?? riskPipeline.unattributedSignalTypes.length;
 
   const clampPosition = (x: number, y: number): { x: number; y: number } => {
     const panelWidth = panelRef.current?.offsetWidth || 252;
@@ -168,9 +180,24 @@ export function SecurityPanel({
         <div className="chat-activity" aria-label="Observed chat activity">
           <p className="metric"><strong>Chat messages observed:</strong> {chatActivity.messagesObserved}</p>
           {chatActivity.suspiciousLinks > 0 && (
-            <p className="metric"><strong>Suspicious links:</strong> {chatActivity.suspiciousLinks}</p>
+            <p className="metric"><strong>Short-link signals (heuristic):</strong> {chatActivity.suspiciousLinks}</p>
           )}
         </div>
+        {(riskPipeline.participantStates.some((state) => state.score > 0)
+          || unattributedSignalCount > 0) && (
+          <div className="risk-pipeline" aria-label="Risk pipeline observations">
+            {riskPipeline.participantStates.filter((state) => state.score > 0).map((state) => (
+              <p className="metric" key={state.participantName}>
+                <strong>{state.participantName}:</strong> {state.score} ({getRiskLevel(state.score)})
+              </p>
+            ))}
+            {unattributedSignalCount > 0 && (
+              <p className="metric">
+                <strong>Unattributed security signals:</strong> {unattributedSignalCount}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -179,6 +206,7 @@ export function SecurityPanel({
 export interface SecurityPanelController {
   setParticipants: (participants: Participant[]) => void;
   setChatActivity: (activity: ChatActivitySummary) => void;
+  setRiskPipeline: (snapshot: RiskPipelineSnapshot) => void;
   unmount: () => void;
 }
 
@@ -186,16 +214,22 @@ export function mountSecurityPanel(
   root: HTMLElement,
   participants: Participant[] = [],
   chatActivity: ChatActivitySummary = { messagesObserved: 0, suspiciousLinks: 0 },
+  riskPipeline: RiskPipelineSnapshot = emptyRiskPipeline,
 ): SecurityPanelController {
   const shadowRoot = root.attachShadow({ mode: 'open' });
   const reactRoot = createRoot(shadowRoot);
   let currentParticipants = participants;
   let currentChatActivity = chatActivity;
+  let currentRiskPipeline = riskPipeline;
 
   const render = (): void => {
     reactRoot.render(
       <React.StrictMode>
-        <SecurityPanel participants={currentParticipants} chatActivity={currentChatActivity} />
+        <SecurityPanel
+          participants={currentParticipants}
+          chatActivity={currentChatActivity}
+          riskPipeline={currentRiskPipeline}
+        />
       </React.StrictMode>,
     );
   };
@@ -209,6 +243,10 @@ export function mountSecurityPanel(
     },
     setChatActivity: (nextActivity) => {
       currentChatActivity = nextActivity;
+      render();
+    },
+    setRiskPipeline: (snapshot) => {
+      currentRiskPipeline = snapshot;
       render();
     },
     unmount: () => {

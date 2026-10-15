@@ -1,13 +1,16 @@
 import { MeetAdapter } from '../adapters/meet/meet-adapter';
+import { EventPipeline } from '../core/event-pipeline';
 import { SecurityPanelHost } from '../ui/security-panel-host';
 import { isActiveGoogleMeetUrl } from './meeting-detection';
 
 const panelHost = new SecurityPanelHost();
 const chatActivity = { messagesObserved: 0, suspiciousLinks: 0 };
+const eventPipeline = new EventPipeline((snapshot) => panelHost.setRiskPipeline(snapshot));
 const adapter = new MeetAdapter(
   document,
   (participants) => panelHost.setParticipants(participants),
   (event) => {
+    eventPipeline.handleEvent(event);
     if (event.type === 'CHAT_MESSAGE') chatActivity.messagesObserved += 1;
     if (event.type === 'SUSPICIOUS_LINK') chatActivity.suspiciousLinks += 1;
     panelHost.setChatActivity({ ...chatActivity });

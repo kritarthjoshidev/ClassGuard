@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyEvent, calculateRisk, getRiskLevel, shouldEmitAlert } from './risk-engine';
+import { applyEvent, calculateRisk, decayRisk, getRiskLevel, shouldEmitAlert } from './risk-engine';
 
 describe('risk engine', () => {
   it('keeps score capped and applies rule cooldowns', () => {
@@ -53,6 +53,12 @@ describe('risk engine', () => {
     expect(getRiskLevel(34)).toBe('safe');
     expect(getRiskLevel(35)).toBe('watch');
     expect(getRiskLevel(70)).toBe('high');
+  });
+
+  it('decays risk by five points per minute and never below zero', () => {
+    expect(decayRisk(30, 60_000)).toBe(25);
+    expect(decayRisk(2, 60_000)).toBe(0);
+    expect(decayRisk(30, 0)).toBe(30);
   });
 
   it('does not auto-kick and only alerts an already high-risk participant', () => {

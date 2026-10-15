@@ -1,5 +1,5 @@
 import type { Participant } from '../adapters/meet/participant-detector';
-import type { ChatActivitySummary } from '../core/types';
+import type { ChatActivitySummary, RiskPipelineSnapshot } from '../core/types';
 import { mountSecurityPanel } from './SecurityPanel';
 
 export class SecurityPanelHost {
@@ -7,6 +7,12 @@ export class SecurityPanelHost {
   private readonly mountTarget = document.createElement('div');
   private panelController: ReturnType<typeof mountSecurityPanel> | null = null;
   private chatActivity: ChatActivitySummary = { messagesObserved: 0, suspiciousLinks: 0 };
+  private riskPipeline: RiskPipelineSnapshot = {
+    participantStates: [],
+    unattributedObservationCount: 0,
+    unattributedSignalTypes: [],
+    unattributedSignalCount: 0,
+  };
 
   constructor() {
     this.host.setAttribute('data-classguard-security-panel', 'true');
@@ -26,7 +32,7 @@ export class SecurityPanelHost {
   mount(): void {
     if (this.panelController) return;
     document.body.appendChild(this.host);
-    this.panelController = mountSecurityPanel(this.mountTarget, [], this.chatActivity);
+    this.panelController = mountSecurityPanel(this.mountTarget, [], this.chatActivity, this.riskPipeline);
   }
 
   setParticipants(participants: Participant[]): void {
@@ -36,6 +42,11 @@ export class SecurityPanelHost {
   setChatActivity(activity: ChatActivitySummary): void {
     this.chatActivity = activity;
     this.panelController?.setChatActivity(activity);
+  }
+
+  setRiskPipeline(snapshot: RiskPipelineSnapshot): void {
+    this.riskPipeline = snapshot;
+    this.panelController?.setRiskPipeline(snapshot);
   }
 
   remove(): void {
