@@ -201,6 +201,74 @@ describe('ParticipantDetector', () => {
     expect(onParticipants).toHaveBeenCalledWith([]);
   });
 
+  it('updates a participant when its existing aria-label changes', async () => {
+    const participant = createParticipant('p-1', 'Alice Sharma');
+    document.body.appendChild(participant);
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    participant.setAttribute('aria-label', 'Alicia Sharma');
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0]).toEqual([
+      { participantName: 'Alicia Sharma', observedAt: expect.any(Number) },
+    ]);
+    detector.stop();
+  });
+
+  it('updates a participant when an existing name text node changes', async () => {
+    const participant = document.createElement('div');
+    participant.dataset.participantId = 'p-1';
+    const name = document.createElement('span');
+    name.textContent = 'Alice Sharma';
+    participant.appendChild(name);
+    document.body.appendChild(participant);
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    name.firstChild!.textContent = 'Alicia Sharma';
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0]).toEqual([
+      { participantName: 'Alicia Sharma', observedAt: expect.any(Number) },
+    ]);
+    detector.stop();
+  });
+
+  it('detects an existing element when it gains a participant id', async () => {
+    const participant = document.createElement('div');
+    participant.setAttribute('aria-label', 'Alice Sharma');
+    document.body.appendChild(participant);
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+    onParticipants.mockClear();
+
+    participant.dataset.participantId = 'p-1';
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledTimes(1);
+    expect(onParticipants.mock.calls[0][0]).toEqual([
+      { participantName: 'Alice Sharma', observedAt: expect.any(Number) },
+    ]);
+    detector.stop();
+  });
+
   it('does not emit when participant ordering changes', () => {
     document.body.append(
       createParticipant('p-1', 'Alice Sharma'),

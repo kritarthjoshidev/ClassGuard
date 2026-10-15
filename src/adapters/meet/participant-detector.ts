@@ -42,7 +42,7 @@ export class ParticipantDetector {
 
   constructor(private readonly root: Document, onParticipantsChange: ParticipantChangeHandler) {
     this.onParticipantsChange = onParticipantsChange;
-    this.observer = new MutationObserver(() => this.scheduleRefresh());
+    this.observer = new MutationObserver((records) => this.handleMutations(records));
   }
 
   start(): void {
@@ -51,6 +51,9 @@ export class ParticipantDetector {
     this.observer.observe(this.root.documentElement, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'data-participant-id'],
+      characterData: true,
     });
     this.scheduleRefresh();
   }
@@ -72,6 +75,22 @@ export class ParticipantDetector {
       this.refreshTimer = null;
       this.refresh();
     }, this.debounceMs);
+  }
+
+  private handleMutations(records: MutationRecord[]): void {
+    if (!this.active) return;
+
+    const hasRelevantMutation = records.some((record) => {
+      if (record.type === 'childList') return true;
+      if (record.type === 'attributes' && record.attributeName === 'data-participant-id') return true;
+
+      const target = record.target instanceof Element
+        ? record.target
+        : record.target.parentElement;
+      return Boolean(target?.closest(PARTICIPANT_SELECTOR));
+    });
+
+    if (hasRelevantMutation) this.scheduleRefresh();
   }
 
   private refresh(): void {
