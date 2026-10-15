@@ -112,6 +112,28 @@ describe('ParticipantDetector', () => {
     detector.stop();
   });
 
+  it('extracts a clean display name from generic participant-card descendants', () => {
+    const card = document.createElement('div');
+    card.dataset.participantId = 'p-1';
+    card.textContent = 'frame_person Reframe visual_effects Backgrounds and effects More options for Phoenix';
+
+    const nameElement = document.createElement('span');
+    nameElement.textContent = 'Phoenix';
+    card.appendChild(nameElement);
+    document.body.appendChild(card);
+
+    const onParticipants = vi.fn();
+    const detector = new ParticipantDetector(document, onParticipants);
+
+    detector.start();
+    vi.advanceTimersByTime(200);
+
+    expect(onParticipants).toHaveBeenCalledWith([
+      { participantName: 'Phoenix', observedAt: expect.any(Number) },
+    ]);
+    detector.stop();
+  });
+
   it('ignores generic participant UI and non-participant labels', () => {
     const genericParticipants = document.createElement('button');
     genericParticipants.setAttribute('aria-label', 'Participants');

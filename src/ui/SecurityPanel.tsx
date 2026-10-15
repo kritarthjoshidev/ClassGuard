@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Participant } from '../adapters/meet/participant-detector';
+import type { ChatActivitySummary } from '../core/types';
 
 export interface SecurityPanelProps {
   participants?: Participant[];
+  chatActivity?: ChatActivitySummary;
 }
 
 const panelStyles = `
@@ -68,7 +70,10 @@ const panelStyles = `
   .collapsed .header { border-radius: 14px 14px 0 0; }
 `;
 
-export function SecurityPanel({ participants = [] }: SecurityPanelProps) {
+export function SecurityPanel({
+  participants = [],
+  chatActivity = { messagesObserved: 0, suspiciousLinks: 0 },
+}: SecurityPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -160,6 +165,12 @@ export function SecurityPanel({ participants = [] }: SecurityPanelProps) {
               </div>
             ))}
         </div>
+        <div className="chat-activity" aria-label="Observed chat activity">
+          <p className="metric"><strong>Chat messages observed:</strong> {chatActivity.messagesObserved}</p>
+          {chatActivity.suspiciousLinks > 0 && (
+            <p className="metric"><strong>Suspicious links:</strong> {chatActivity.suspiciousLinks}</p>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -167,18 +178,24 @@ export function SecurityPanel({ participants = [] }: SecurityPanelProps) {
 
 export interface SecurityPanelController {
   setParticipants: (participants: Participant[]) => void;
+  setChatActivity: (activity: ChatActivitySummary) => void;
   unmount: () => void;
 }
 
-export function mountSecurityPanel(root: HTMLElement, participants: Participant[] = []): SecurityPanelController {
+export function mountSecurityPanel(
+  root: HTMLElement,
+  participants: Participant[] = [],
+  chatActivity: ChatActivitySummary = { messagesObserved: 0, suspiciousLinks: 0 },
+): SecurityPanelController {
   const shadowRoot = root.attachShadow({ mode: 'open' });
   const reactRoot = createRoot(shadowRoot);
   let currentParticipants = participants;
+  let currentChatActivity = chatActivity;
 
   const render = (): void => {
     reactRoot.render(
       <React.StrictMode>
-        <SecurityPanel participants={currentParticipants} />
+        <SecurityPanel participants={currentParticipants} chatActivity={currentChatActivity} />
       </React.StrictMode>,
     );
   };
@@ -188,6 +205,10 @@ export function mountSecurityPanel(root: HTMLElement, participants: Participant[
   return {
     setParticipants: (nextParticipants) => {
       currentParticipants = nextParticipants;
+      render();
+    },
+    setChatActivity: (nextActivity) => {
+      currentChatActivity = nextActivity;
       render();
     },
     unmount: () => {

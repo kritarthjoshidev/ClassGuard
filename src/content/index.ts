@@ -3,7 +3,17 @@ import { SecurityPanelHost } from '../ui/security-panel-host';
 import { isActiveGoogleMeetUrl } from './meeting-detection';
 
 const panelHost = new SecurityPanelHost();
-const adapter = new MeetAdapter(document, (participants) => panelHost.setParticipants(participants));
+const chatActivity = { messagesObserved: 0, suspiciousLinks: 0 };
+const adapter = new MeetAdapter(
+  document,
+  (participants) => panelHost.setParticipants(participants),
+  (event) => {
+    if (event.type === 'CHAT_MESSAGE') chatActivity.messagesObserved += 1;
+    if (event.type === 'SUSPICIOUS_LINK') chatActivity.suspiciousLinks += 1;
+    panelHost.setChatActivity({ ...chatActivity });
+    emit(`Chat activity detected: ${event.type}`);
+  },
+);
 
 function emit(message: string): void {
   console.info(`[ClassGuard] ${message}`);

@@ -22,3 +22,8 @@ export interface ParticipantState {
   events: NormalizedEvent[];
   lastUpdated: number;
 }
+
+export interface ChatActivitySummary {
+  messagesObserved: number;
+  suspiciousLinks: number;
+}

@@ -1,10 +1,12 @@
 import type { Participant } from '../adapters/meet/participant-detector';
+import type { ChatActivitySummary } from '../core/types';
 import { mountSecurityPanel } from './SecurityPanel';
 
 export class SecurityPanelHost {
   private readonly host = document.createElement('div');
   private readonly mountTarget = document.createElement('div');
   private panelController: ReturnType<typeof mountSecurityPanel> | null = null;
+  private chatActivity: ChatActivitySummary = { messagesObserved: 0, suspiciousLinks: 0 };
 
   constructor() {
     this.host.setAttribute('data-classguard-security-panel', 'true');
@@ -24,11 +26,16 @@ export class SecurityPanelHost {
   mount(): void {
     if (this.panelController) return;
     document.body.appendChild(this.host);
-    this.panelController = mountSecurityPanel(this.mountTarget);
+    this.panelController = mountSecurityPanel(this.mountTarget, [], this.chatActivity);
   }
 
   setParticipants(participants: Participant[]): void {
     this.panelController?.setParticipants(participants);
+  }
+
+  setChatActivity(activity: ChatActivitySummary): void {
+    this.chatActivity = activity;
+    this.panelController?.setChatActivity(activity);
   }
 
   remove(): void {
