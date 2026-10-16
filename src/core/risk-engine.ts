@@ -1,5 +1,7 @@
 import type { NormalizedEvent, ParticipantState, RiskLevel } from './types';
 
+const MAX_RISK_EVENTS_PER_PARTICIPANT = 100;
+
 const RULES: Record<NormalizedEvent['type'], { score: number; cooldownMs: number }> = {
   CHAT_MESSAGE: { score: 0, cooldownMs: 0 },
   CHAT_SPAM: { score: 25, cooldownMs: 30_000 },
@@ -58,7 +60,7 @@ export function applyEvent(state: ParticipantState, event: NormalizedEvent): Par
     ...state,
     score,
     reasons: [...reasons],
-    events: [...state.events, event],
+    events: [...state.events, event].slice(-MAX_RISK_EVENTS_PER_PARTICIPANT),
     lastUpdated: event.timestamp,
   };
 }

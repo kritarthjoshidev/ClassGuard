@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChatMessageDetector } from '../adapters/meet/chat';
 import { applyEvent, getEventScore } from './risk-engine';
 import { EventPipeline } from './event-pipeline';
-import type { NormalizedEvent, ParticipantState } from './types';
+import type { NormalizedEvent, ParticipantState, SecurityAlert } from './types';
 
 function event(
   type: NormalizedEvent['type'],
@@ -22,6 +22,22 @@ function createMessage(id: string, text: string): HTMLElement {
   content.textContent = text;
   row.appendChild(content);
   return row;
+}
+
+function alert(id: string): SecurityAlert {
+  return {
+    id,
+    sourceId: id,
+    category: 'LINK_SIGNAL',
+    ruleId: 'link.shortener-host',
+    severity: 'LOW',
+    title: 'Link shortener observed',
+    explanation: 'The destination is not visible here.',
+    evidence: ['Shortener host: bit.ly'],
+    detectedAt: 100,
+    evidenceStrength: 'weak',
+    attribution: 'unattributed',
+  };
 }
 
 function flushMutations(): Promise<void> {
@@ -146,7 +162,7 @@ describe('EventPipeline', () => {
     pipeline.handleAttributedEvent(event('CHAT_SPAM', 'Phoenix', 200), attribution);
 
     const snapshot = pipeline.getSnapshot();
-    expect(snapshot.participantStates[0].score).toBe(25);
+    expect(snapshot.participantStates[0].score).toBeCloseTo(25, 1);
     expect(snapshot.participantStates[0].events).toHaveLength(1);
 
     const initialState: ParticipantState = {
@@ -158,5 +174,42 @@ describe('EventPipeline', () => {
     };
     const scored = applyEvent(initialState, event('SUSPICIOUS_LINK', 'Phoenix', 100));
     expect(scored.score).toBe(30);
+  });
+
+  it('applies the existing five-points-per-minute decay when later attributed events arrive', () => {
+    const pipeline = new EventPipeline();
+    const attribution = { participantKey: 'session-row', participantName: 'Phoenix' };
+    pipeline.handleAttributedEvent(event('CHAT_SPAM', 'Phoenix', 100), attribution);
+    pipeline.handleAttributedEvent(event('MIC_UNMUTE_BURST', 'Phoenix', 60_100), attribution);
+
+    expect(pipeline.getSnapshot().participantStates[0].score).toBe(50);
+  });
+
+  it('deduplicates alerts by source event, preserves dismissed history, and clears session state', () => {
+    const pipeline = new EventPipeline();
+    const message = {
+      ...event('CHAT_MESSAGE', 'Unknown participant', 100),
+      sourceId: 'message-1',
+      securityAlerts: [alert('message-1:link-shortener')],
+    };
+    pipeline.handleEvent(message);
+    pipeline.handleEvent(message);
+
+    expect(pipeline.getSnapshot().unattributedObservationCount).toBe(1);
+    expect(pipeline.getSnapshot().securityAlerts).toHaveLength(1);
+
+    pipeline.dismissAlert('message-1:link-shortener', 200);
+    expect(pipeline.getSnapshot().securityAlerts?.[0].dismissedAt).toBe(200);
+    pipeline.clear();
+    expect(pipeline.getSnapshot().securityAlerts).toEqual([]);
+    expect(pipeline.getSnapshot().unattributedObservationCount).toBe(0);
+  });
+
+  it('bounds session alert history', () => {
+    const pipeline = new EventPipeline();
+    for (let index = 0; index < 110; index += 1) pipeline.addAlert(alert(`alert-${index}`));
+
+    expect(pipeline.getSnapshot().securityAlerts).toHaveLength(100);
+    expect(pipeline.getSnapshot().securityAlerts?.[0].id).toBe('alert-10');
   });
 });

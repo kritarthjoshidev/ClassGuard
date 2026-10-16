@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ParticipantState } from './types';
 import { applyEvent, calculateRisk, decayRisk, getRiskLevel, shouldEmitAlert } from './risk-engine';
 
 describe('risk engine', () => {
@@ -59,6 +60,27 @@ describe('risk engine', () => {
     expect(decayRisk(30, 60_000)).toBe(25);
     expect(decayRisk(2, 60_000)).toBe(0);
     expect(decayRisk(30, 0)).toBe(30);
+  });
+
+  it('bounds retained participant event evidence to the latest 100 events', () => {
+    let state: ParticipantState = {
+      participantName: 'Verified row',
+      score: 0,
+      reasons: [],
+      events: [],
+      lastUpdated: 0,
+    };
+    for (let timestamp = 1; timestamp <= 150; timestamp += 1) {
+      state = applyEvent(state, {
+        type: 'CHAT_MESSAGE',
+        participantName: 'Verified row',
+        timestamp,
+        metadata: {},
+      });
+    }
+
+    expect(state.events).toHaveLength(100);
+    expect(state.events[0].timestamp).toBe(51);
   });
 
   it('does not auto-kick and only alerts an already high-risk participant', () => {

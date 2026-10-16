@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { calculateRisk, getEventScore } from '../../core/risk-engine';
+import type { SecurityAlert } from '../../core/types';
 import { ChatMessageDetector, parseChatMessage } from './chat';
 import { hasSuspiciousUrl } from './signals';
 
@@ -114,6 +115,31 @@ describe('ChatMessageDetector', () => {
     detector.stop();
   });
 
+  it('handles a message row whose message id and text arrive after insertion', async () => {
+    const onEvent = vi.fn();
+    const detector = new ChatMessageDetector(document, onEvent);
+    detector.start();
+    const row = document.createElement('div');
+    const content = document.createElement('div');
+    content.setAttribute('jsname', 'dTKtvb');
+    row.appendChild(content);
+    document.body.appendChild(row);
+    await Promise.resolve();
+
+    row.setAttribute('data-message-id', 'late-message-id');
+    await Promise.resolve();
+    content.textContent = 'Loaded after the row';
+    await flushMutations();
+
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(onEvent.mock.calls[0][0]).toMatchObject({
+      type: 'CHAT_MESSAGE',
+      sourceId: 'late-message-id',
+      metadata: { messageLength: 'Loaded after the row'.length },
+    });
+    detector.stop();
+  });
+
   it('counts only the surviving row when Meet replaces an optimistic message row', async () => {
     const onEvent = vi.fn();
     const detector = new ChatMessageDetector(document, onEvent);
@@ -164,6 +190,7 @@ describe('ChatMessageDetector', () => {
     expect(onEvent.mock.calls[1][0].metadata).toEqual({
       messageLength: 'Open https://bit.ly/example'.length,
       suspiciousLinkDetected: true,
+      signalCount: 1,
     });
     detector.stop();
   });
@@ -222,6 +249,23 @@ describe('ChatMessageDetector', () => {
     detector.stop();
   });
 
+  it('restarts cleanly and treats messages already on the page as history', async () => {
+    const onEvent = vi.fn();
+    const detector = new ChatMessageDetector(document, onEvent);
+    detector.start();
+    detector.stop();
+    document.body.appendChild(createMessage('history-after-restart', 'Do not replay'));
+    detector.start();
+    await flushMutations();
+
+    expect(onEvent).not.toHaveBeenCalled();
+    document.body.appendChild(createMessage('new-after-restart', 'Count this one'));
+    await flushMutations();
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(onEvent.mock.calls[0][0].sourceId).toBe('new-after-restart');
+    detector.stop();
+  });
+
   it('does not persist message text or participant data to chrome.storage', async () => {
     const storageWrite = vi.fn();
     vi.stubGlobal('chrome', { storage: { local: { set: storageWrite } } });
@@ -255,6 +299,44 @@ describe('ChatMessageDetector', () => {
     expect(getEventScore(suspiciousLinkEvent)).toBe(30);
     expect(calculateRisk([suspiciousLinkEvent])).toBe(30);
     expect(JSON.stringify(messageEvent)).not.toContain('Hello');
+    detector.stop();
+  });
+
+  it('attaches explainable message findings without retaining the message text', async () => {
+    const onEvent = vi.fn();
+    const detector = new ChatMessageDetector(document, onEvent);
+    detector.start();
+    document.body.appendChild(createMessage(
+      'message-alert',
+      'Urgent: send your OTP immediately or your account will be locked https://bit.ly/demo',
+    ));
+    await flushMutations();
+
+    const messageEvent = onEvent.mock.calls.find(([event]) => event.type === 'CHAT_MESSAGE')?.[0];
+    expect(messageEvent?.sourceId).toBe('message-alert');
+    expect(messageEvent?.securityAlerts?.map((alert: SecurityAlert) => alert.category)).toEqual([
+      'LINK_SIGNAL',
+      'PHISHING_INDICATOR',
+    ]);
+    expect(JSON.stringify(messageEvent)).not.toContain('send your OTP');
+    detector.stop();
+  });
+
+  it('analyzes anchor hrefs even when the linked destination is not written as text', async () => {
+    const onEvent = vi.fn();
+    const detector = new ChatMessageDetector(document, onEvent);
+    detector.start();
+    const message = createMessage('linked-message', 'Open this link');
+    const anchor = document.createElement('a');
+    anchor.href = 'https://tinyurl.com/hidden-destination';
+    anchor.textContent = 'this link';
+    message.querySelector('[jsname="dTKtvb"]')?.appendChild(anchor);
+    document.body.appendChild(message);
+    await flushMutations();
+
+    const messageEvent = onEvent.mock.calls.find(([event]) => event.type === 'CHAT_MESSAGE')?.[0];
+    expect(messageEvent?.securityAlerts?.some((alert: SecurityAlert) => alert.ruleId === 'link.shortener-host')).toBe(true);
+    expect(JSON.stringify(messageEvent)).not.toContain('hidden-destination');
     detector.stop();
   });
 });
